@@ -7,6 +7,7 @@
 
 // ---------------------------------------------------------------------------
 #include <Wire.h>
+#include <LiquidCrystal.h>
 // ------------------- Define some constants for convenience -----------------
 #define CHANNEL1 0
 #define CHANNEL2 1
@@ -28,6 +29,10 @@
 #define STOPPED  0
 #define STARTING 1
 #define STARTED  2
+#define LANDING  3
+
+int lcdCounter = 0;
+LiquidCrystal lcd(16, 17, 15, 12, 3, 2);
 // ---------------- Receiver variables ---------------------------------------
 // Previous state of each channel (HIGH or LOW)
 volatile byte previous_state[4];
@@ -117,6 +122,14 @@ int battery_voltage;
 void setup() {
 
     Serial.begin(57600);
+    lcd.begin(16, 2);
+    lcd.setCursor(0,0);
+
+    analogWrite(A0, 0);
+    
+    lcd.print("Initiating Boot");
+    lcd.setCursor(0,1);
+    lcd.print("Please Wait...");
     
     // Start I2C communication
     Wire.begin();
@@ -148,6 +161,9 @@ void setup() {
 
     // Turn LED off now setup is done
     digitalWrite(13, LOW);
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print("Booted");
 }
 
 /**
@@ -175,14 +191,14 @@ void loop() {
 
     // 6. Apply motors speed
     applyMotorSpeed();
-//  Serial.println(pulse_length_esc1);
-//  Serial.println(pulse_length_esc2);  
-//  Serial.println(pulse_length_esc3);  
-//  Serial.println(pulse_length_esc4);  
-//  Serial.println(); 
-//  Serial.println(); 
-//  Serial.println(); 
-//
+  Serial.println(pulse_length_esc1);
+  Serial.println(pulse_length_esc2);  
+  Serial.println(pulse_length_esc3);  
+  Serial.println(pulse_length_esc4);  
+  Serial.println(); 
+  Serial.println(); 
+  Serial.println(); 
+
 //  Serial.println(gyro_angle[X]);
 //  Serial.println(gyro_angle[Y]);  
 //  Serial.println(gyro_angle[Z]);  
@@ -193,17 +209,19 @@ void loop() {
 //  Serial.println(); 
 
 
-    Serial.print("          YAW: ");
-    Serial.print(pulse_length[mode_mapping[YAW]]);
-
-    Serial.print("          ROLL: ");
-    Serial.print(pulse_length[mode_mapping[ROLL]]);
-
-    Serial.println("          Throttle: ");
-    Serial.print(pulse_length[mode_mapping[THROTTLE]]);
-
-    Serial.print("           Pitch: ");
-    Serial.println(pulse_length[mode_mapping[PITCH]]);
+//    Serial.println(lcdCounter);
+//    Serial.print("          YAW: ");
+//    Serial.print(pulse_length[mode_mapping[YAW]]);
+//
+//    Serial.print("          ROLL: ");
+//    Serial.print(pulse_length[mode_mapping[ROLL]]);
+//
+//    Serial.println("          Throttle: ");
+//    Serial.print(pulse_length[mode_mapping[THROTTLE]]);
+//
+//    Serial.print("           Pitch: ");
+//    Serial.println(pulse_length[mode_mapping[PITCH]]);
+    LCDInterface();
 }
 
 /**
@@ -342,6 +360,10 @@ void pidController() {
     float roll_pid     = 0;
     int   throttle     = pulse_length[mode_mapping[THROTTLE]];
 
+    if (status == 4) {
+        throttle = 1500;
+    }
+
     // Initialize motor commands with throttle
     pulse_length_esc1 = throttle;
     pulse_length_esc2 = throttle;
@@ -370,6 +392,8 @@ void pidController() {
 //        Serial.println(pulse_length[mode_mapping[YAW]]);  
 //        Serial.println(pulse_length[mode_mapping[PITCH]]);  
 //        Serial.println(pulse_length[mode_mapping[ROLL]]);  
+
+        balanceDrone();
     }
 
     // Prevent out-of-range-values
@@ -513,7 +537,7 @@ float minMax(float value, float min_value, float max_value) {
  * @return bool
  */
 bool isStarted() {
-    status = STARTED;
+      status = STARTED;
       resetPidController();
 
       resetGyroAngles();
@@ -533,6 +557,11 @@ bool isStarted() {
         resetGyroAngles();
     }
 
+    // When left stick is moved in the bottom left corner
+    if (status == STARTED && pulse_length[mode_mapping[YAW]] <= 1315 && pulse_length[mode_mapping[THROTTLE]] <= 1012) {
+        status = LANDING;
+    }
+
     // When left stick is moved in the bottom right corner
     if (status == STARTED && pulse_length[mode_mapping[YAW]] >= 1700 && pulse_length[mode_mapping[THROTTLE]] <= 1012) {
         status = STOPPED;
@@ -540,7 +569,7 @@ bool isStarted() {
         stopAll();
     }
 
-    return status == STARTED;
+    return status == (STARTED || LANDING);
 }
 
 /**
@@ -643,24 +672,152 @@ void compensateBatteryDrop() {
 }
 
 void balanceDrone() {
-  if (gyro_angle[X] >= 2) {
-    pulse_length_esc1 += gyro_angle[X];
-    pulse_length_esc3 += gyro_angle[X];
-  } else if (gyro_angle[X] <= -2) {
-    pulse_length_esc2 += (gyro_angle[X] * -1);
-    pulse_length_esc4 += (gyro_angle[X] * -1);
-  }
-
-    if (gyro_angle[Y] >= 2) {
-    pulse_length_esc1 += gyro_angle[Y];
-    pulse_length_esc2 += gyro_angle[Y];
-  } else if (gyro_angle[Y] <= -2) {
-    pulse_length_esc3 += (gyro_angle[Y] * -1);
-    pulse_length_esc4 += (gyro_angle[Y] * -1);
+  if (pulse_length[mode_mapping[THROTTLE]] <= 1500) {
+    if (gyro_angle[X] >= 2) {
+      pulse_length_esc1 += balanceCalc(gyro_angle[X]);
+      pulse_length_esc3 += balanceCalc(gyro_angle[X]);
+    } else if (gyro_angle[X] <= -2) {
+      pulse_length_esc2 += (balanceCalc(gyro_angle[X]) * -1);
+      pulse_length_esc4 += (balanceCalc(gyro_angle[X]) * -1);
+    }
+  
+      if (gyro_angle[Y] >= 2) {
+      pulse_length_esc1 += balanceCalc(gyro_angle[Y]);
+      pulse_length_esc2 += balanceCalc(gyro_angle[Y]);
+    } else if (gyro_angle[Y] <= -2) {
+      pulse_length_esc3 += (balanceCalc(gyro_angle[Y]) * -1);
+      pulse_length_esc4 += (balanceCalc(gyro_angle[Y]) * -1);
+    }
+  } else if (pulse_length[mode_mapping[THROTTLE]] > 1500) {
+        if (gyro_angle[X] <= -2) {
+      pulse_length_esc1 += balanceCalc(gyro_angle[X]);
+      pulse_length_esc3 += balanceCalc(gyro_angle[X]);
+    } else if (gyro_angle[X] >= 2) {
+      pulse_length_esc2 += (balanceCalc(gyro_angle[X]) * -1);
+      pulse_length_esc4 += (balanceCalc(gyro_angle[X]) * -1);
+    }
+  
+      if (gyro_angle[Y] <= -2) {
+      pulse_length_esc1 += balanceCalc(gyro_angle[Y]);
+      pulse_length_esc2 += balanceCalc(gyro_angle[Y]);
+    } else if (gyro_angle[Y] >= 2) {
+      pulse_length_esc3 += (balanceCalc(gyro_angle[Y]) * -1);
+      pulse_length_esc4 += (balanceCalc(gyro_angle[Y]) * -1);
+    }
   }
 }
 
+void LCDInterface() {
+  if (status == LANDING){
+    lcd.clear();
+    lcd.print("LANDING...");
+  } else {
+    if (lcdCounter <= 500) {
+      if (lcdCounter % 20 == 0) {
+        lcd.clear();
+        lcd.print("Motor Speeds");
+        lcd.setCursor(0,1);
+        lcd.print(calculateMotorPercent(pulse_length_esc1));
+        lcd.print("% ");
+        lcd.print(calculateMotorPercent(pulse_length_esc2));
+        lcd.print("% ");
+        lcd.print(calculateMotorPercent(pulse_length_esc3));
+        lcd.print("% ");
+        lcd.print(calculateMotorPercent(pulse_length_esc4)); 
+        lcd.print("%");
+      }
+    
+    } else if (lcdCounter > 500 && lcdCounter <= 1000) {
+      if (lcdCounter % 20 == 0) {
+        lcd.clear();
+        lcd.print("Throttle Input");
+        lcd.setCursor(0,1);
+        lcd.print(calculateMotorPercent(pulse_length[mode_mapping[THROTTLE]]));
+        lcd.print("%");
+    }
+    
+    } else if (lcdCounter > 1000 && lcdCounter <= 1500) {
+      if (lcdCounter % 20 == 0) {
+        lcd.clear();
+        lcd.print("Gyro Angles");
+        lcd.setCursor(0,1);
+        lcd.print("X: ");
+        lcd.print(gyro_angle[X]);
+        lcd.print("Y: ");
+        lcd.print(gyro_angle[Y]);
+      }
 
+    
+    } else if (lcdCounter > 1500 && lcdCounter <= 2000) {
+      if (lcdCounter % 20 == 0) {
+        lcd.clear();
+        lcd.print("Status");
+        lcd.setCursor(0,1);
+        if (status == STARTED && pulse_length[mode_mapping[YAW]] >= 1700 && pulse_length[mode_mapping[THROTTLE]] <= 1012) {
+        lcd.print("Stopped");
+        } else {
+          switch(status) {
+            case 0:
+            lcd.print("Stopped");
+            break;
+  
+            case 1:
+            lcd.print("Starting");
+            break;
+  
+            case 2:
+            lcd.print("Running");
+            break;
+        }
+      }
+    }
+    } else if (lcdCounter > 2000 && lcdCounter <= 2500) {
+      if (lcdCounter % 20 == 0) {
+        lcd.clear();
+        lcd.print("The Handy Drone");
+      }
+    
+    } else if (lcdCounter > 2500 && lcdCounter <= 3000) {
+      if (lcdCounter % 20 == 0) {
+        lcd.clear();
+        lcd.print("Ethan Ahn");
+        lcd.setCursor(0,1);
+        lcd.print("Michael Del Duca");
+      }
+    } else if (lcdCounter > 3000) {
+      lcdCounter = 0;
+    }
+
+    lcdCounter += 1;
+  }
+  
+}
+
+int calculateMotorPercent(float motorSpeed) {
+  float percentMotorSpeed = 0;
+
+  percentMotorSpeed = ((motorSpeed - 1000) / (1000)) * 100;
+
+  int percent = percentMotorSpeed;
+  return percent;
+}
+
+
+int balanceCalc(int gyroAngle) {
+  if (gyroAngle <= 15 && gyroAngle > 0) {
+    gyroAngle *= gyroAngle;
+  } else if (gyroAngle >= -15 && gyroAngle < 0) {
+    gyroAngle *= abs(gyroAngle);
+  } else {
+    gyroAngle *= 2;
+    if (gyroAngle < 0) {
+      gyroAngle -= 225;
+    } else if (gyroAngle > 0) {
+      gyroAngle += 225;
+    }
+  }
+  return gyroAngle;
+}
 /**
  * Read battery voltage & return whether the battery seems connected
  *
