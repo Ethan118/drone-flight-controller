@@ -360,7 +360,8 @@ void pidController() {
     float roll_pid     = 0;
     int   throttle     = pulse_length[mode_mapping[THROTTLE]];
 
-    if (status == 4) {
+    // if the drone is in the landing status override the throttle
+    if (status == LANDING) {
         throttle = 1500;
     }
 
@@ -557,7 +558,7 @@ bool isStarted() {
         resetGyroAngles();
     }
 
-    // When left stick is moved in the bottom left corner
+    // When left stick is moved in the bottom left corner and already started
     if (status == STARTED && pulse_length[mode_mapping[YAW]] <= 1315 && pulse_length[mode_mapping[THROTTLE]] <= 1012) {
         status = LANDING;
     }
@@ -671,7 +672,12 @@ void compensateBatteryDrop() {
     }
 }
 
+/**
+ * Keeps drone balanced by compensating motor speeds based on gyro angles
+ */ 
 void balanceDrone() {
+
+  // if the throttle is below 1500 add the compensation to the motors that are lower
   if (pulse_length[mode_mapping[THROTTLE]] <= 1500) {
     if (gyro_angle[X] >= 2) {
       pulse_length_esc1 += balanceCalc(gyro_angle[X]);
@@ -688,6 +694,8 @@ void balanceDrone() {
       pulse_length_esc3 += (balanceCalc(gyro_angle[Y]) * -1);
       pulse_length_esc4 += (balanceCalc(gyro_angle[Y]) * -1);
     }
+
+  // if the throttle is above 1500 remove the compensation from the motors that are higher
   } else if (pulse_length[mode_mapping[THROTTLE]] > 1500) {
         if (gyro_angle[X] <= -2) {
       pulse_length_esc1 += balanceCalc(gyro_angle[X]);
@@ -707,11 +715,21 @@ void balanceDrone() {
   }
 }
 
+/**
+ * controls LCD screen printing the drone's status and environment variables
+ * 
+ */
 void LCDInterface() {
+
+  // if the drone's status is 'LANDING' print landing to the screen
   if (status == LANDING){
     lcd.clear();
     lcd.print("LANDING...");
+  
+  // otherwise cycle through enviroment variables printing them to the screen for 500 cycles each
   } else {
+
+    // motor speeds
     if (lcdCounter <= 500) {
       if (lcdCounter % 20 == 0) {
         lcd.clear();
@@ -727,6 +745,7 @@ void LCDInterface() {
         lcd.print("%");
       }
     
+    // throttle
     } else if (lcdCounter > 500 && lcdCounter <= 1000) {
       if (lcdCounter % 20 == 0) {
         lcd.clear();
@@ -736,6 +755,7 @@ void LCDInterface() {
         lcd.print("%");
     }
     
+    // gyro angles
     } else if (lcdCounter > 1000 && lcdCounter <= 1500) {
       if (lcdCounter % 20 == 0) {
         lcd.clear();
@@ -747,7 +767,7 @@ void LCDInterface() {
         lcd.print(gyro_angle[Y]);
       }
 
-    
+    // drone status
     } else if (lcdCounter > 1500 && lcdCounter <= 2000) {
       if (lcdCounter % 20 == 0) {
         lcd.clear();
@@ -768,15 +788,18 @@ void LCDInterface() {
             case 2:
             lcd.print("Running");
             break;
+          }
         }
       }
-    }
+
+    // name
     } else if (lcdCounter > 2000 && lcdCounter <= 2500) {
       if (lcdCounter % 20 == 0) {
         lcd.clear();
         lcd.print("The Handy Drone");
       }
     
+    // creators
     } else if (lcdCounter > 2500 && lcdCounter <= 3000) {
       if (lcdCounter % 20 == 0) {
         lcd.clear();
@@ -784,6 +807,8 @@ void LCDInterface() {
         lcd.setCursor(0,1);
         lcd.print("Michael Del Duca");
       }
+
+    // reset and cycle back
     } else if (lcdCounter > 3000) {
       lcdCounter = 0;
     }
@@ -793,6 +818,12 @@ void LCDInterface() {
   
 }
 
+/**
+ * calculates current percentage of maximum motor speed 
+ * 
+ * @param motorSpeed 
+ * @return int 
+ */
 int calculateMotorPercent(float motorSpeed) {
   float percentMotorSpeed = 0;
 
@@ -802,12 +833,21 @@ int calculateMotorPercent(float motorSpeed) {
   return percent;
 }
 
-
+/**
+ * calculate balance coeiffecient for motor speeds based on gyro angles
+ * 
+ * @param gyroAngle 
+ * @return int 
+ */
 int balanceCalc(int gyroAngle) {
+
+  // if the gyro angle is between 15 degrees to the left or right exponetially compensate based on error
   if (gyroAngle <= 15 && gyroAngle > 0) {
     gyroAngle *= gyroAngle;
   } else if (gyroAngle >= -15 && gyroAngle < 0) {
     gyroAngle *= abs(gyroAngle);
+
+  // otherwise outside of these boundaries compensate linearally
   } else {
     gyroAngle *= 2;
     if (gyroAngle < 0) {
