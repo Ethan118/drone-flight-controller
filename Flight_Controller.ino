@@ -1,10 +1,3 @@
-/**
- * The software is provided "as is", without any warranty of any kind.
- * Feel free to edit it if needed.
- *
- * @author lobodol <grobodol@gmail.com>
- */
-
 // ---------------------------------------------------------------------------
 #include <Wire.h>
 #include <LiquidCrystal.h>
@@ -191,25 +184,7 @@ void loop() {
 
     // 6. Apply motors speed
     applyMotorSpeed();
-  Serial.println(pulse_length_esc1);
-  Serial.println(pulse_length_esc2);  
-  Serial.println(pulse_length_esc3);  
-  Serial.println(pulse_length_esc4);  
-  Serial.println(); 
-  Serial.println(); 
-  Serial.println(); 
-
-//  Serial.println(gyro_angle[X]);
-//  Serial.println(gyro_angle[Y]);  
-//  Serial.println(gyro_angle[Z]);  
-//  Serial.println(); 
-//    Serial.println(); 
-//  Serial.println(); 
-//  Serial.println(); 
-//  Serial.println(); 
-
-
-//    Serial.println(lcdCounter);
+        
 //    Serial.print("          YAW: ");
 //    Serial.print(pulse_length[mode_mapping[YAW]]);
 //
@@ -221,6 +196,8 @@ void loop() {
 //
 //    Serial.print("           Pitch: ");
 //    Serial.println(pulse_length[mode_mapping[PITCH]]);
+    
+    // 7. Print info to lcd
     LCDInterface();
 }
 
@@ -388,11 +365,6 @@ void pidController() {
         pulse_length_esc2 = throttle + roll_pid - pitch_pid - yaw_pid;
         pulse_length_esc3 = throttle - roll_pid + pitch_pid - yaw_pid;
         pulse_length_esc4 = throttle + roll_pid + pitch_pid + yaw_pid;
-//
-//        Serial.println();
-//        Serial.println(pulse_length[mode_mapping[YAW]]);  
-//        Serial.println(pulse_length[mode_mapping[PITCH]]);  
-//        Serial.println(pulse_length[mode_mapping[ROLL]]);  
 
         balanceDrone();
     }
