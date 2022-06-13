@@ -185,17 +185,17 @@ void loop() {
     // 6. Apply motors speed
     applyMotorSpeed();
         
-//    Serial.print("          YAW: ");
-//    Serial.print(pulse_length[mode_mapping[YAW]]);
-//
-//    Serial.print("          ROLL: ");
-//    Serial.print(pulse_length[mode_mapping[ROLL]]);
-//
-//    Serial.println("          Throttle: ");
-//    Serial.print(pulse_length[mode_mapping[THROTTLE]]);
-//
-//    Serial.print("           Pitch: ");
-//    Serial.println(pulse_length[mode_mapping[PITCH]]);
+   Serial.print("          YAW: ");
+   Serial.print(pulse_length[mode_mapping[YAW]]);
+
+   Serial.print("          ROLL: ");
+   Serial.print(pulse_length[mode_mapping[ROLL]]);
+
+   Serial.println("          Throttle: ");
+   Serial.print(pulse_length[mode_mapping[THROTTLE]]);
+
+   Serial.print("           Pitch: ");
+   Serial.println(pulse_length[mode_mapping[PITCH]]);
     
     // 7. Print info to lcd
     LCDInterface();
@@ -206,8 +206,6 @@ void loop() {
  * Direct port manipulation is used for performances.
  *
  * This function might not take more than 2ms to run, which lets 2ms remaining to do other stuff.
- *
- * @see https:// www.arduino.cc/en/Reference/PortManipulation
  */
 void applyMotorSpeed() {
     // Refresh rate is 250Hz: send ESC pulses every 4000µs
@@ -421,8 +419,6 @@ void configureChannelMapping() {
  * Configure gyro and accelerometer precision as following:
  *  - accelerometer: ±8g
  *  - gyro: ±500°/s
- *
- * @see https://www.invensense.com/wp-content/uploads/2015/02/MPU-6000-Register-Map1.pdf
  */
 void setupMpu6050Registers() {
     // Configure power management
@@ -850,9 +846,6 @@ bool isBatteryConnected() {
  * The trick here is to use port registers to read pin state.
  * Doing (PINB & B00000001) is the same as digitalRead(8) with the advantage of using less CPU loops.
  * It is less convenient but more efficient, which is the most important here.
- *
- * @see https://www.arduino.cc/en/Reference/PortManipulation
- * @see https://www.firediy.fr/article/utiliser-sa-radiocommande-avec-un-arduino-drone-ch-6
  */
 
 ISR(PCINT0_vect) {
